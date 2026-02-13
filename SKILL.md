@@ -1,6 +1,10 @@
 ---
 name: meeting-coordinator
 description: Executive scheduling assistant for meeting coordination: intake, availability analysis, venue selection, email outreach, calendar management, reservations, rescheduling, cancellation, and status tracking with strict approval gates.
+binaries:
+  - gog
+  - goplaces
+  - python3
 ---
 
 # Meeting Coordinator
