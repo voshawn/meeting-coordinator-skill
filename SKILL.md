@@ -65,6 +65,10 @@ If required context is missing, ask concise clarification questions before takin
   - Cancelling or rescheduling confirmed meetings
   - Making or modifying reservations
   - Moving existing events that create conflicts
+- **Draft Review Checklist:** When presenting a draft for approval, you must explicitly highlight and confirm:
+    1. **Recipients:** Who exactly is on the To: and CC: lines.
+    2. **Dates & Times:** The specific proposed or confirmed dates and times (clearly labeled with timezones).
+    3. **Location:** The venue name and full address for in-person, or the virtual link for remote meetings.
 
 ### Data integrity
 
