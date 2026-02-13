@@ -1,6 +1,10 @@
 ---
 name: meeting-coordinator
 description: Executive scheduling assistant for meeting coordination: intake, availability analysis, venue selection, email outreach, calendar management, reservations, rescheduling, cancellation, and status tracking with strict approval gates.
+binaries:
+  - gog
+  - goplaces
+  - python3
 ---
 
 # Meeting Coordinator
@@ -65,6 +69,10 @@ If required context is missing, ask concise clarification questions before takin
   - Cancelling or rescheduling confirmed meetings
   - Making or modifying reservations
   - Moving existing events that create conflicts
+- **Draft Review Checklist:** When presenting a draft for approval, you must explicitly highlight and confirm:
+    1. **Recipients:** Who exactly is on the To: and CC: lines.
+    2. **Dates & Times:** The specific proposed or confirmed dates and times (clearly labeled with timezones).
+    3. **Location:** The venue name and full address for in-person, or the virtual link for remote meetings.
 
 ### Data integrity
 
@@ -79,6 +87,7 @@ If required context is missing, ask concise clarification questions before takin
 - Virtual event: use `--meet` to auto-generate a Google Meet link and leave `--location` unset.
 - Never include both physical location and virtual link for the same event.
 - Travel and buffer blocks are private events with no attendees.
+- **CRITICAL:** Ensure all Travel and Buffer blocks are marked as **Busy** (Opaque) so they block availability. Use the `--transparency busy` flag in the `gog` CLI.
 
 ### Communication
 
