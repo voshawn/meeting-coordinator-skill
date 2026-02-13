@@ -1,275 +1,300 @@
 ---
 name: meeting-coordinator
-description: Schedule and coordinate meetings — availability checks, venue search, calendar invites, email coordination, reservations, and tracking. Triggers: scheduling meetings, finding venues, checking availability, sending invites, rescheduling, cancelling.
+description: Executive scheduling assistant for meeting coordination: intake, availability analysis, venue selection, email outreach, calendar management, reservations, rescheduling, cancellation, and status tracking with strict approval gates.
 ---
 
 # Meeting Coordinator
 
-Schedule and coordinate meetings: availability, venues, calendar invites, reservations, email, and tracking.
+Operate as a high-precision executive assistant for scheduling.
 
-## Prerequisites
+## Use This Skill When
 
-**USER.md must contain:**
-- Name, email, calendar ID (may differ from email)
-- Timezone
-- Availability window (preferred days + hours)
-- Meeting durations by type (virtual, coffee, lunch/dinner)
-- Buffer preferences (travel time, post-meeting buffer)
-- Transit/location preferences (for venue selection)
-- Venue preferences (e.g., "no chains, casual")
+Use this skill when the human asks to:
+- Schedule a new meeting
+- Reschedule or cancel an existing meeting
+- Respond to or manage a forwarded scheduling email thread
+- Find venues for in-person meetings
+- Send meeting confirmations or follow-ups
 
-**SOUL.md / IDENTITY.md must contain:**
-- Assistant name, tone guidance, email signature
+## Objective
 
-**Tools required:**
-- `gog` CLI — authenticated with calendar + Gmail access
-- `goplaces` CLI — for venue search
+Minimize scheduling friction while protecting the human's time and reputation:
+- Propose high-quality options quickly
+- Prevent calendar conflicts and duplicate bookings
+- Keep every external message on-brand and approved
+- Maintain a complete tracking record
 
-## Workflows
+## Required Context
 
-### 1. Schedule a New Meeting
+### `USER.md` must provide
+- Human full name
+- Human email
+- Calendar ID (may not match email)
+- Home timezone (IANA, e.g. `America/New_York`)
+- Preferred scheduling windows (days + hours)
+- Default meeting durations by type
+- Travel and post-meeting buffer preferences
+- Location/transit preferences
+- Venue preferences
 
-**Gather → Check → Propose → Block → Send → Track**
+### `SOUL.md` or `IDENTITY.md` must provide
+- Assistant tone guidelines
+- Email signature block
 
-**Step 1: Gather details**
-From conversation or forwarded email, establish:
-- Who? (name, email)
-- Type? (virtual / coffee / lunch / dinner)
-- Purpose?
-- Constraints? (dates, times, location preferences)
-- Where is the other person based? (for venue optimization)
+### Tools
+- `gog` CLI with calendar and Gmail access
+- `goplaces` CLI for venue lookup
+- Local scripts:
+  - `scripts/check-availability.py`
+  - `scripts/find-venue.py`
 
-**Step 2: Check availability**
+If required context is missing, ask concise clarification questions before taking action.
+
+## Non-Negotiable Rules
+
+### Approval gates
+- Always get explicit human approval before:
+  - Sending any email
+  - Creating, updating, or deleting any counterparty-visible calendar event
+  - Cancelling or rescheduling confirmed meetings
+  - Making or modifying reservations
+  - Moving existing events that create conflicts
+
+### Data integrity
+- Never fabricate attendee emails, addresses, reservation details, or message IDs.
+- Never use `primary` calendar unless the human explicitly instructs it.
+- Always use timezone-aware timestamps.
+- Always capture and track event IDs after create/update/delete actions.
+
+### Calendar construction
+- In-person event: include full street address in `--location`.
+- Virtual event: include meeting link in `--description` and leave `--location` unset.
+- Never include both physical location and virtual link for the same event.
+- Travel and buffer blocks are private events with no attendees.
+
+### Communication
+- Draft first, then get approval, then send.
+- CC the human on outgoing scheduling messages.
+- Reply in-thread when a thread exists.
+- Match tone and signature from `SOUL.md`/`IDENTITY.md`.
+- Send outbound emails as HTML using `gog gmail send --body-html`.
+- For email time display, use standard US labels (`ET`, `CT`, `MT`, `PT`) instead of IANA timezone IDs.
+- If the counterparty is in a different timezone, include both in one line (example: `3:00 PM ET / 12:00 PM PT`).
+
+## Canonical Meeting Record
+
+Tracking file: `memory/scheduling/in-progress.md`
+
+Create one entry per meeting and update on every state change.
+
+Required fields:
+- `meeting_id` (stable local identifier)
+- `counterparty_name`
+- `counterparty_email`
+- `meeting_type` (`virtual` | `coffee` | `lunch` | `dinner` | `other`)
+- `purpose`
+- `timezone`
+- `status`
+- `proposed_options`
+- `selected_option`
+- `calendar_event_ids`:
+  - `tentative`
+  - `main`
+  - `travel_to`
+  - `buffer_post`
+  - `travel_home`
+- `venue` (name + full address, if in-person)
+- `reservation` (`none` | details/confirmation code | `phone-needed` | `walk-in`)
+- `thread_context` (subject + message/thread identifiers when available)
+- `created_at`
+- `updated_at`
+
+Recommended status lifecycle:
+`intake` -> `awaiting-human-approval` -> `awaiting-counterparty` -> `confirmed` -> `completed`
+Alternative terminal states: `cancelled`, `closed-no-response`
+
+## Standard Workflow
+
+### 1. Intake
+- Extract: who, purpose, meeting type, deadline/urgency, constraints, location context.
+- Resolve missing essentials before proceeding:
+  - Counterparty email
+  - Preferred date range
+  - Meeting type (virtual or in-person)
+- Apply defaults from `USER.md` only when the human has not specified values.
+
+### 2. Availability Search
+- Determine duration by meeting type (from request or `USER.md` defaults).
+- Check multiple candidate dates inside preferred windows.
+
 ```bash
-python3 meeting-coordinator/scripts/check-availability.py \
-  --calendar <calendar_id> --date YYYY-MM-DD \
-  --duration <minutes> --tz <timezone>
+python3 scripts/check-availability.py \
+  --calendar <calendar_id> \
+  --date YYYY-MM-DD \
+  --duration <minutes> \
+  --start-hour <0-23> \
+  --end-hour <1-24> \
+  --tz <iana_timezone>
 ```
-Check multiple dates within the human's preferred window.
 
-**Step 3: Evaluate conflicts**
-For any slot with an existing event:
-- Personal blocks (gym, lunch, focus) → probably movable
-- Meetings with one person → potentially movable
-- Meetings with many people → not movable
-- Ask before moving anything: "You have [event] then — is that flexible?"
+- Conflict triage:
+  - Hard conflict: multi-attendee commitments, immovable commitments
+  - Soft conflict: personal/focus blocks that may be moved
+- Never move conflicts without explicit approval.
 
-**Step 4: Find venue (in-person only)**
+### 3. Venue Search (In-Person Only)
+
 ```bash
-python3 meeting-coordinator/scripts/find-venue.py \
-  --location "Neighborhood, City" --type coffee|lunch|dinner
+python3 scripts/find-venue.py \
+  --location "Neighborhood, City" \
+  --type coffee|lunch|dinner \
+  --min-rating <optional>
 ```
-Filter results by: transit accessibility, human's venue preferences (USER.md), and the other party's location.
 
-**Address validation:** Always verify the venue address with goplaces or a reliable source. If unsure, confirm with the human before creating the calendar invite.
+- Generate 2-3 strong venue options.
+- Validate full street address before using it in invites/emails.
+- Filter by transit convenience and stated preferences.
 
-**Step 5: Present options → get approval**
-Summarize 2–3 options with:
-- Date/time
-- Venue + address + travel time
-- Duration and buffer impact
-- Any conflicts that need to move
-- Reservation status
+### 4. Build Approval Packet For Human
+Present a concise options table including:
+- Date/time with display timezone labels (`ET`, `CT`, `MT`, `PT`)
+- Dual-time display when counterparty timezone differs (example: `3:00 PM ET / 12:00 PM PT`)
+- Duration
+- Venue + full address (if in-person)
+- Travel/buffer impact
+- Known conflicts and required moves
+- Reservation feasibility
 
-**Do not proceed until the human approves.**
+Do not contact the counterparty until the human approves.
 
-**Step 6: Block tentative times (if multiple options)**
+### 5. Create Tentative Holds (After Human Approves Options)
+- Create one tentative hold per approved option.
+- Use color `8` for tentative.
+- Record every hold event ID immediately.
 
-If proposing **multiple time options**, hold ALL proposed slots as tentative:
 ```bash
 gog calendar create <calendar_id> \
-  --summary "HOLD: [Name] — [Type] (Option N)" \
-  --from "YYYY-MM-DDTHH:MM:00<tz-offset>" \
-  --to "YYYY-MM-DDTHH:MM:00<tz-offset>" \
+  --summary "HOLD: <Counterparty Name> (<Option Label>)" \
+  --from "YYYY-MM-DDTHH:MM:SS<offset>" \
+  --to "YYYY-MM-DDTHH:MM:SS<offset>" \
   --event-color 8
 ```
-Color 8 = gray (tentative). **Record every event ID in the tracking file.**
 
-If proposing **only one option**, skip tentative blocks and proceed directly to Workflow 2 (create the confirmed event).
+### 6. Outreach Email
+- Use templates in `references/email-templates.md`.
+- Draft message for approval first.
+- After approval, send and store thread/message identifiers in tracking.
+- Use `--body-html` when sending email.
 
-**Step 7: Send proposal to the other party**
-Draft email using template from `references/email-templates.md`.
-- Get human's approval before sending
-- CC human on the email
-- Reply to existing thread when one exists
+### 7. Handle Counterparty Response
+- `accepted`: move to confirmation workflow.
+- `counter-proposed`: re-run availability and return to human for approval.
+- `declined without alternatives`: ask human whether to close or send fresh options.
+- No response after 2 business days: ask human whether to send follow-up.
 
-**Step 8: Track**
-Add entry to `memory/scheduling/in-progress.md` with all event IDs and status.
+### 8. Confirm Meeting
 
-**Step 9: On response**
-- **Confirmed** → Workflow 2 (Confirm a Meeting)
-- **Counter-proposed** → update tracking, return to Step 2
-- **No response after 2+ days** → ask human whether to follow up
-
----
-
-### 2. Confirm a Meeting
-
-**Step 1: Delete unused tentative blocks**
+1. Delete unused tentative holds.
 ```bash
-gog calendar delete <calendar_id> <event-id> --force
+gog calendar delete <calendar_id> <event_id> --force
 ```
-Repeat for every tentative hold that wasn't selected.
 
-**Step 2: Create main event**
+2. Create confirmed main event.
 
-*In-person:*
+In-person:
 ```bash
 gog calendar create <calendar_id> \
-  --summary "Shawn // [Name]" \
-  --from "..." --to "..." \
-  --location "[Venue], [Full Street Address]" \
+  --summary "<Human Name> // <Counterparty Name>" \
+  --from "YYYY-MM-DDTHH:MM:SS<offset>" \
+  --to "YYYY-MM-DDTHH:MM:SS<offset>" \
+  --location "<Venue Name>, <Full Street Address>" \
   --description "" \
-  --attendees <their-email>
+  --attendees <counterparty_email>
 ```
 
-*Virtual:*
+Virtual:
 ```bash
 gog calendar create <calendar_id> \
-  --summary "Shawn // [Name]" \
-  --from "..." --to "..." \
-  --description "Google Meet: [link]" \
-  --attendees <their-email>
+  --summary "<Human Name> // <Counterparty Name>" \
+  --from "YYYY-MM-DDTHH:MM:SS<offset>" \
+  --to "YYYY-MM-DDTHH:MM:SS<offset>" \
+  --description "Google Meet: <meeting_link>" \
+  --attendees <counterparty_email>
 ```
 
-**Rules:**
-- `--location` OR Meet link in description — never both
-- Descriptions: Keep empty for main events (no backstory or signatures) unless there's a specific agenda.
-- Invitations: Only the other party gets invited; travel/buffer blocks are private
-
-**Step 3: Create travel-to block (in-person only)**
+3. Add travel and post-meeting blocks when required by preferences.
 ```bash
 gog calendar create <calendar_id> \
-  --summary "Travel: Home → [Venue]" \
-  --from "<event start minus travel time>" \
-  --to "<event start>" --event-color 10
+  --summary "Travel: Home -> <Venue>" \
+  --from "<start minus travel>" \
+  --to "<start>" \
+  --event-color 10
 ```
 
-**Step 4: Create post-meeting buffer**
 ```bash
 gog calendar create <calendar_id> \
   --summary "Buffer: Post-meeting" \
-  --from "<event end>" \
-  --to "<event end + buffer duration>" --event-color 10
+  --from "<meeting end>" \
+  --to "<meeting end plus buffer>" \
+  --event-color 10
 ```
 
-**Step 5: Create travel-home block (in-person only)**
 ```bash
 gog calendar create <calendar_id> \
-  --summary "Travel: [Venue] → Home" \
+  --summary "Travel: <Venue> -> Home" \
   --from "<buffer end>" \
-  --to "<buffer end + travel time>" --event-color 10
+  --to "<buffer end plus travel>" \
+  --event-color 10
 ```
 
-Color 10 = green. No attendees on any travel/buffer block.
+4. Reservation handling (in-person):
+- Try online booking first.
+- If online booking unavailable, ask human whether to call.
+- Add reservation details to main event description when confirmed.
 
-**Step 6: Handle reservation**
-- Search online first (Resy, OpenTable, venue website)
-- If no online booking, ask the human to call
-- Book under human's name, party of 2 (default)
-- Add confirmation number to main event description via `gog calendar update`
+5. Send confirmation follow-up email (after approval).
+6. Update tracking record with final event IDs and status `confirmed`.
 
-**Step 7: Send confirmation follow-up**
-Use "Calendar Invite Follow-Up" template. CC human.
+### 9. Reschedule
+1. Get explicit human approval.
+2. Propose new options via Steps 2-4.
+3. Send approved reschedule outreach.
+4. On acceptance: update or recreate events, then clear obsolete entries.
+5. Update reservation and tracking.
 
-**Step 8: Update tracking**
-Record all event IDs (main, travel-to, buffer, travel-home). Mark confirmed.
+### 10. Cancel
+1. Get explicit human approval.
+2. Cancel or delete all related events.
+3. Cancel reservation when applicable.
+4. Send approved cancellation email.
+5. Mark tracking entry `cancelled` with reason and timestamp.
 
----
+### 11. Day-Before Confirmation
+For in-person or high-stakes meetings:
+1. Draft confirmation message.
+2. Get approval and send.
+3. Re-verify reservation details (if any).
 
-### 3. Reschedule
+## Command Usage Notes
 
-1. Get human's approval
-2. Find new availability (Steps 2–3 from Workflow 1)
-3. Block tentative times for new options
-4. Send reschedule email (template, CC human)
-5. On confirmation: delete old events (main + travel + buffer), run Workflow 2
-6. Update or cancel reservation
-7. Update tracking
+- Prefer absolute timestamps with explicit UTC offsets (`-05:00`, `-08:00`, etc.).
+- Always read command output and capture created/updated event IDs.
+- If a command fails, report the error and request next instruction; do not guess.
+- Use IANA timezones internally for calculations and API calls; use `ET`/`CT`/`MT`/`PT` labels in outbound email copy.
 
----
+## Email Template Reference
 
-### 4. Cancel
+Use `references/email-templates.md` for:
+- Initial proposals
+- Invite follow-ups
+- Day-before confirmations
+- Reschedule and cancellation messages
+- No-response nudges
 
-1. Get human's explicit approval
-2. Delete all calendar events (main, travel-to, buffer, travel-home)
-3. Cancel reservation if one exists
-4. Send cancellation email (template, CC human)
-5. Update tracking — mark cancelled with reason and date
+## Quality Bar
 
----
-
-### 5. Handle Forwarded Email
-
-1. Read entire email chain — extract who, what, when, type, constraints
-2. Acknowledge to human: "Got it — I'll coordinate with [Name]."
-3. Follow Workflow 1
-
----
-
-### 6. Day-Before Confirmation
-
-For in-person or high-stakes meetings, the day before:
-1. Draft confirmation email (template)
-2. Get approval → send
-3. Verify reservation (check online or ask human to confirm)
-
----
-
-## Calendar Rules
-
-| Rule | Detail |
-|------|--------|
-| Calendar ID | Use the ID from USER.md — never `primary` (may be the assistant's calendar) |
-| In-person events | Always set `--location` with full street address |
-| Virtual events | Meet link in description only, no `--location` |
-| Location vs Meet | One or the other. Never both. |
-| Descriptions | Keep empty (no backstory/signature) unless specifically needed for an agenda. |
-| Travel/buffer blocks | Color 10 (green), no attendees, no invitations |
-| Tentative holds | Color 8 (gray), store IDs, delete after resolution |
-| Event titles | `Shawn // [Name]` |
-
-## Email Rules
-
-- **Draft first** — never send without human's approval
-- **CC human** — on every outgoing email
-- **Reply to threads** — use `--reply-to-message-id` when a thread exists
-- **HTML format** — `--body-html` with signature from SOUL.md
-- **Timestamps** — always include timezone from USER.md
-- **Tone** — match SOUL.md guidance (professional, warm)
-
-## Reservation Handling
-
-- Search online first (Resy, OpenTable, venue website)
-- **Always verify the full street address** using goplaces or a reliable source
-- If the address seems questionable, confirm with the human before using it
-- If unavailable online, ask human to call
-- Book under human's name, default party of 2
-- Add confirmation details to calendar event description
-- Walk-in spots: note "No reservation needed" in description
-
-## Tracking
-
-**File:** `memory/scheduling/in-progress.md`
-
-Each entry must include:
-- Contact name and email
-- Meeting type and purpose
-- Status: `proposed` → `pending` → `confirmed` → `completed` | `cancelled`
-- All calendar event IDs (tentative holds, main, travel-to, buffer, travel-home)
-- Venue details
-- Reservation: `none` | `Resy #ABC123` | `OpenTable #XYZ` | `phone needed` | `walk-in ok`
-- Dates: added, last updated
-
-Update on every state change. Archive completed meetings weekly.
-
-
-## Tools
-
-| Tool | Usage |
-|------|-------|
-| `check-availability.py` | `--calendar <id> --date YYYY-MM-DD --duration <min> --tz <tz>` |
-| `find-venue.py` | `--location "Area, City" --type coffee\|lunch\|dinner` |
-| `gog calendar` | `create / update / delete / events` — calendar operations |
-| `gog gmail` | `search / send` — email operations |
-| `goplaces search` | `"<query>"` — venue discovery |
+Before finishing any scheduling task, verify:
+- Human approvals are documented for every outbound action
+- Calendar is conflict-checked and internally consistent
+- Counterparty communications are concise, accurate, and timezone-clear
+- Tracking file is updated with status, IDs, and timestamps
