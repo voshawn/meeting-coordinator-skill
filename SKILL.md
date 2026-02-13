@@ -79,6 +79,7 @@ If required context is missing, ask concise clarification questions before takin
 - Virtual event: use `--meet` to auto-generate a Google Meet link and leave `--location` unset.
 - Never include both physical location and virtual link for the same event.
 - Travel and buffer blocks are private events with no attendees.
+- **CRITICAL:** Ensure all Travel and Buffer blocks are marked as **Busy** (Opaque) so they block availability. Use the `--transparency busy` flag in the `gog` CLI.
 
 ### Communication
 
