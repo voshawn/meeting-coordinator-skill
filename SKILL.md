@@ -93,8 +93,10 @@ If required context is missing, ask concise clarification questions before takin
 ## Canonical Meeting Record
 
 Tracking file: `memory/scheduling/in-progress.md`
+Archive file: `memory/scheduling/archive.md`
 
 Create one entry per meeting and update on every state change.
+Never delete active entries from `in-progress.md`.
 
 Required fields:
 
@@ -107,21 +109,82 @@ Required fields:
 - `status`
 - `proposed_options`
 - `selected_option`
-- `calendar_event_ids`:
+- `calendar_event_ids_active`:
   - `tentative`
   - `main`
   - `travel_to`
   - `buffer_post`
   - `travel_home`
+- `calendar_event_ids_deleted` (list of `{event_id, deleted_at, reason}`)
 - `venue` (name + full address, if in-person)
 - `reservation` (`none` | details/confirmation code | `phone-needed` | `walk-in`)
 - `thread_context` (subject + message/thread identifiers when available)
 - `created_at`
 - `updated_at`
+- `activity_log` (append-only)
 
-Recommended status lifecycle:
+Status lifecycle:
 `intake` -> `awaiting-human-approval` -> `awaiting-counterparty` -> `confirmed` -> `completed`
 Alternative terminal states: `cancelled`, `closed-no-response`
+
+Allowed transitions:
+- `intake` -> `awaiting-human-approval` | `cancelled`
+- `awaiting-human-approval` -> `awaiting-counterparty` | `cancelled`
+- `awaiting-counterparty` -> `confirmed` | `awaiting-human-approval` | `closed-no-response` | `cancelled`
+- `confirmed` -> `completed` | `awaiting-human-approval` | `cancelled`
+- `completed` | `cancelled` | `closed-no-response` -> eligible for archive move after retention window
+
+### Tracking Entry Template
+
+Use this structure for each meeting entry:
+
+```markdown
+## <meeting_id> — <counterparty_name>
+- meeting_id: <meeting_id>
+- counterparty_name: <name>
+- counterparty_email: <email>
+- meeting_type: <virtual|coffee|lunch|dinner|other>
+- purpose: <short text>
+- timezone: <IANA timezone>
+- status: <status>
+- proposed_options: <list or none>
+- selected_option: <option or none>
+- calendar_event_ids_active:
+  - tentative: []
+  - main: []
+  - travel_to: []
+  - buffer_post: []
+  - travel_home: []
+- calendar_event_ids_deleted: []
+- venue: <name + full address or none>
+- reservation: <none|details>
+- thread_context: <subject + ids or none>
+- created_at: <ISO 8601 timestamp with offset>
+- updated_at: <ISO 8601 timestamp with offset>
+
+### Activity Log
+- <timestamp> Entry created.
+```
+
+### Editing Protocol (Strict)
+
+1. Locate existing entry by `meeting_id`. If missing, create a new entry.
+2. Update only the relevant entry. Do not rewrite, reorder, or remove unrelated entries.
+3. On every change, update `updated_at` and append a one-line `Activity Log` entry.
+4. Never erase event IDs after calendar deletions.
+5. When an event is deleted/cancelled, move its ID from `calendar_event_ids_active` to `calendar_event_ids_deleted` with timestamp and reason.
+6. Keep terminal entries in `in-progress.md` until retention rules permit archival.
+
+### Retention and Cleanup Policy (14-Day Rule)
+
+Retention is based on `updated_at`.
+
+- Only remove an entry from `in-progress.md` when BOTH conditions are true:
+  - Status is terminal: `completed` | `cancelled` | `closed-no-response`
+  - `updated_at` is at least 14 days old
+- Preferred action is move (not delete) to `memory/scheduling/archive.md`.
+- Non-terminal entries are never auto-deleted, regardless of age.
+- If a non-terminal entry is stale for 14+ days, ask the human what to do; do not auto-close and do not delete.
 
 ## Standard Workflow
 
@@ -217,6 +280,9 @@ gog calendar create <calendar_id> \
 gog calendar delete <calendar_id> <event_id> --force
 ```
 
+Record each deleted hold in `calendar_event_ids_deleted` with timestamp and reason.
+Do not delete the meeting entry.
+
 1. Create confirmed main event.
 
 In-person:
@@ -282,8 +348,9 @@ gog calendar create <calendar_id> \
 1. Get explicit human approval.
 2. Propose new options via Steps 2-4.
 3. Send approved reschedule outreach.
-4. On acceptance: update or recreate events, then clear obsolete entries.
-5. Update reservation and tracking.
+4. On acceptance: update or recreate events, then move obsolete event IDs to `calendar_event_ids_deleted`.
+5. Do not delete the meeting entry from `in-progress.md`.
+6. Update reservation and tracking.
 
 ### 10. Cancel
 
@@ -292,6 +359,7 @@ gog calendar create <calendar_id> \
 3. Cancel reservation when applicable.
 4. Send approved cancellation email.
 5. Mark tracking entry `cancelled` with reason and timestamp.
+6. Keep the cancelled entry in `in-progress.md` until 14-day retention threshold is met, then archive it.
 
 ### 11. Day-Before Confirmation
 
@@ -326,3 +394,4 @@ Before finishing any scheduling task, verify:
 - Calendar is conflict-checked and internally consistent
 - Counterparty communications are concise, accurate, and timezone-clear
 - Tracking file is updated with status, IDs, and timestamps
+- No non-terminal tracking entries were removed from `in-progress.md`
