@@ -25,6 +25,7 @@ The agent sends email as the agent Gmail account and schedules on the human's sh
 - no fabricated emails, venues, reservation details, or thread IDs
 - timezone-safe communication
 - complete tracking in `memory/scheduling/in-progress.md`
+- conservative record lifecycle management (no active record deletion)
 
 ## Repository Contents
 
@@ -70,19 +71,19 @@ The agent sends email as the agent Gmail account and schedules on the human's sh
 ```bash
 chmod +x scripts/check-availability.py scripts/find-venue.py
 ```
-1. Verify required CLIs are available:
+3. Verify required CLIs are available:
 
 ```bash
 gog --help
 goplaces --help
 ```
-1. Verify scripts run:
+4. Verify scripts run:
 
 ```bash
 python3 scripts/check-availability.py --help
 python3 scripts/find-venue.py --help
 ```
-1. Confirm the agent can access the human calendar via the configured calendar ID.
+5. Confirm the agent can access the human calendar via the configured calendar ID.
 
 ## Gmail + Calendar Setup (Agent Account)
 
@@ -113,3 +114,10 @@ python3 scripts/find-venue.py --help
 8. On acceptance, create final event and related buffers/travel blocks (virtual meetings use `--meet`)
 9. Send approved confirmation follow-up
 10. Update tracking record with all event IDs and status
+
+## Tracking Lifecycle Policy
+
+- one meeting = one durable entry in `memory/scheduling/in-progress.md`
+- entries are updated in place and include `updated_at` + append-only activity log notes
+- active entries are never auto-deleted
+- entries are moved to archive only when terminal (`completed`, `cancelled`, `closed-no-response`) and 14+ days old since `updated_at`
