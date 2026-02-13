@@ -10,6 +10,7 @@ Operate as a high-precision executive assistant for scheduling.
 ## Use This Skill When
 
 Use this skill when the human asks to:
+
 - Schedule a new meeting
 - Reschedule or cancel an existing meeting
 - Respond to or manage a forwarded scheduling email thread
@@ -19,6 +20,7 @@ Use this skill when the human asks to:
 ## Objective
 
 Minimize scheduling friction while protecting the human's time and reputation:
+
 - Propose high-quality options quickly
 - Prevent calendar conflicts and duplicate bookings
 - Keep every external message on-brand and approved
@@ -27,6 +29,7 @@ Minimize scheduling friction while protecting the human's time and reputation:
 ## Required Context
 
 ### `USER.md` must provide
+
 - Human full name
 - Human email
 - Calendar ID (may not match email)
@@ -38,10 +41,12 @@ Minimize scheduling friction while protecting the human's time and reputation:
 - Venue preferences
 
 ### `SOUL.md` or `IDENTITY.md` must provide
+
 - Assistant tone guidelines
 - Email signature block
 
 ### Tools
+
 - `gog` CLI with calendar and Gmail access
 - `goplaces` CLI for venue lookup
 - Local scripts:
@@ -53,6 +58,7 @@ If required context is missing, ask concise clarification questions before takin
 ## Non-Negotiable Rules
 
 ### Approval gates
+
 - Always get explicit human approval before:
   - Sending any email
   - Creating, updating, or deleting any counterparty-visible calendar event
@@ -61,18 +67,21 @@ If required context is missing, ask concise clarification questions before takin
   - Moving existing events that create conflicts
 
 ### Data integrity
+
 - Never fabricate attendee emails, addresses, reservation details, or message IDs.
 - Never use `primary` calendar unless the human explicitly instructs it.
 - Always use timezone-aware timestamps.
 - Always capture and track event IDs after create/update/delete actions.
 
 ### Calendar construction
+
 - In-person event: include full street address in `--location`.
-- Virtual event: include meeting link in `--description` and leave `--location` unset.
+- Virtual event: use `--meet` to auto-generate a Google Meet link and leave `--location` unset.
 - Never include both physical location and virtual link for the same event.
 - Travel and buffer blocks are private events with no attendees.
 
 ### Communication
+
 - Draft first, then get approval, then send.
 - CC the human on outgoing scheduling messages.
 - Reply in-thread when a thread exists.
@@ -88,6 +97,7 @@ Tracking file: `memory/scheduling/in-progress.md`
 Create one entry per meeting and update on every state change.
 
 Required fields:
+
 - `meeting_id` (stable local identifier)
 - `counterparty_name`
 - `counterparty_email`
@@ -116,6 +126,7 @@ Alternative terminal states: `cancelled`, `closed-no-response`
 ## Standard Workflow
 
 ### 1. Intake
+
 - Extract: who, purpose, meeting type, deadline/urgency, constraints, location context.
 - Resolve missing essentials before proceeding:
   - Counterparty email
@@ -124,6 +135,7 @@ Alternative terminal states: `cancelled`, `closed-no-response`
 - Apply defaults from `USER.md` only when the human has not specified values.
 
 ### 2. Availability Search
+
 - Determine duration by meeting type (from request or `USER.md` defaults).
 - Check multiple candidate dates inside preferred windows.
 
@@ -156,7 +168,9 @@ python3 scripts/find-venue.py \
 - Filter by transit convenience and stated preferences.
 
 ### 4. Build Approval Packet For Human
+
 Present a concise options table including:
+
 - Date/time with display timezone labels (`ET`, `CT`, `MT`, `PT`)
 - Dual-time display when counterparty timezone differs (example: `3:00 PM ET / 12:00 PM PT`)
 - Duration
@@ -168,6 +182,7 @@ Present a concise options table including:
 Do not contact the counterparty until the human approves.
 
 ### 5. Create Tentative Holds (After Human Approves Options)
+
 - Create one tentative hold per approved option.
 - Use color `8` for tentative.
 - Record every hold event ID immediately.
@@ -181,12 +196,14 @@ gog calendar create <calendar_id> \
 ```
 
 ### 6. Outreach Email
+
 - Use templates in `references/email-templates.md`.
 - Draft message for approval first.
 - After approval, send and store thread/message identifiers in tracking.
 - Use `--body-html` when sending email.
 
 ### 7. Handle Counterparty Response
+
 - `accepted`: move to confirmation workflow.
 - `counter-proposed`: re-run availability and return to human for approval.
 - `declined without alternatives`: ask human whether to close or send fresh options.
@@ -195,13 +212,15 @@ gog calendar create <calendar_id> \
 ### 8. Confirm Meeting
 
 1. Delete unused tentative holds.
+
 ```bash
 gog calendar delete <calendar_id> <event_id> --force
 ```
 
-2. Create confirmed main event.
+1. Create confirmed main event.
 
 In-person:
+
 ```bash
 gog calendar create <calendar_id> \
   --summary "<Human Name> // <Counterparty Name>" \
@@ -213,16 +232,18 @@ gog calendar create <calendar_id> \
 ```
 
 Virtual:
+
 ```bash
 gog calendar create <calendar_id> \
   --summary "<Human Name> // <Counterparty Name>" \
   --from "YYYY-MM-DDTHH:MM:SS<offset>" \
   --to "YYYY-MM-DDTHH:MM:SS<offset>" \
-  --description "Google Meet: <meeting_link>" \
-  --attendees <counterparty_email>
+  --attendees <counterparty_email> \
+  --meet
 ```
 
-3. Add travel and post-meeting blocks when required by preferences.
+1. Add travel and post-meeting blocks when required by preferences.
+
 ```bash
 gog calendar create <calendar_id> \
   --summary "Travel: Home -> <Venue>" \
@@ -247,15 +268,17 @@ gog calendar create <calendar_id> \
   --event-color 10
 ```
 
-4. Reservation handling (in-person):
+1. Reservation handling (in-person):
+
 - Try online booking first.
 - If online booking unavailable, ask human whether to call.
 - Add reservation details to main event description when confirmed.
 
-5. Send confirmation follow-up email (after approval).
-6. Update tracking record with final event IDs and status `confirmed`.
+1. Send confirmation follow-up email (after approval).
+2. Update tracking record with final event IDs and status `confirmed`.
 
 ### 9. Reschedule
+
 1. Get explicit human approval.
 2. Propose new options via Steps 2-4.
 3. Send approved reschedule outreach.
@@ -263,6 +286,7 @@ gog calendar create <calendar_id> \
 5. Update reservation and tracking.
 
 ### 10. Cancel
+
 1. Get explicit human approval.
 2. Cancel or delete all related events.
 3. Cancel reservation when applicable.
@@ -270,7 +294,9 @@ gog calendar create <calendar_id> \
 5. Mark tracking entry `cancelled` with reason and timestamp.
 
 ### 11. Day-Before Confirmation
+
 For in-person or high-stakes meetings:
+
 1. Draft confirmation message.
 2. Get approval and send.
 3. Re-verify reservation details (if any).
@@ -285,6 +311,7 @@ For in-person or high-stakes meetings:
 ## Email Template Reference
 
 Use `references/email-templates.md` for:
+
 - Initial proposals
 - Invite follow-ups
 - Day-before confirmations
@@ -294,6 +321,7 @@ Use `references/email-templates.md` for:
 ## Quality Bar
 
 Before finishing any scheduling task, verify:
+
 - Human approvals are documented for every outbound action
 - Calendar is conflict-checked and internally consistent
 - Counterparty communications are concise, accurate, and timezone-clear

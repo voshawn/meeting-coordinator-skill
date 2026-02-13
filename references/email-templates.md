@@ -9,7 +9,6 @@ All templates use placeholders such as:
 - `[ORIGINAL_TIME_DISPLAY]`
 - `[VENUE_NAME]`
 - `[FULL_ADDRESS]`
-- `[MEETING_LINK]`
 - `[SIGNATURE]`
 
 Replace every placeholder before drafting for approval.
@@ -67,7 +66,7 @@ Use after sending the calendar invite to confirm details.
 
 Required inputs:
 - Final confirmed date/time/timezone
-- In-person venue + full address OR virtual link
+- In-person venue + full address OR virtual meeting note
 - Thread subject if replying
 
 Subject:
@@ -81,7 +80,7 @@ I just sent a calendar invite for [MEETING_TYPE] with [HUMAN_NAME]:
 **[DAY_DATE] at [TIME_DISPLAY]**
 [If in-person: "[VENUE_NAME]"]
 [If in-person: "[FULL_ADDRESS]"]
-[If virtual: "Google Meet: [MEETING_LINK]"]
+[If virtual: "Google Meet link is in the calendar invite."]
 
 [Optional one-line venue note if helpful]
 
@@ -109,7 +108,7 @@ Quick confirmation for tomorrow:
 
 **[DAY_DATE] at [TIME_DISPLAY]**
 [If in-person: "[VENUE_NAME], [FULL_ADDRESS]"]
-[If virtual: "Google Meet: [MEETING_LINK]"]
+[If virtual: "Google Meet link is in the calendar invite."]
 [If reservation exists: "Reservation under [HUMAN_NAME]'s name."]
 
 Looking forward to it!

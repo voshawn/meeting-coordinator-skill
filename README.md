@@ -1,6 +1,7 @@
 # Meeting Coordinator Skill
 
 This OpenClaw skill turns the agent into an executive scheduling assistant for:
+
 - new meeting scheduling
 - rescheduling and cancellation
 - availability analysis
@@ -10,6 +11,7 @@ This OpenClaw skill turns the agent into an executive scheduling assistant for:
 ## Operating Model
 
 This README assumes:
+
 - the OpenClaw agent uses its own Gmail account
 - the human shares their Google Calendar with that agent account
 - the shared calendar permission is at least "Make changes to events" (write/manage)
@@ -33,7 +35,7 @@ The agent sends email as the agent Gmail account and schedules on the human's sh
 
 ## Prerequisites
 
-1. OpenClaw/Codex skill loading enabled in your environment
+1. OpenClaw skill loading enabled in your environment
 2. Python 3.10+ (for `zoneinfo` in the scripts)
 3. `gog` CLI installed and authenticated to the agent Gmail account
 4. `goplaces` CLI installed and authenticated
@@ -44,6 +46,7 @@ The agent sends email as the agent Gmail account and schedules on the human's sh
 ## Required Profile Data
 
 `USER.md` should include:
+
 - human full name
 - human email
 - calendar ID to schedule against (shared calendar ID)
@@ -54,6 +57,7 @@ The agent sends email as the agent Gmail account and schedules on the human's sh
 - transit and venue preferences
 
 `SOUL.md` or `IDENTITY.md` should include:
+
 - assistant tone guidance
 - email signature block
 
@@ -62,20 +66,23 @@ The agent sends email as the agent Gmail account and schedules on the human's sh
 1. Install the skill folder at:
 `$CODEX_HOME/skills/meeting-coordinator`
 2. Ensure scripts are executable if needed:
+
 ```bash
 chmod +x scripts/check-availability.py scripts/find-venue.py
 ```
-3. Verify required CLIs are available:
+1. Verify required CLIs are available:
+
 ```bash
 gog --help
 goplaces --help
 ```
-4. Verify scripts run:
+1. Verify scripts run:
+
 ```bash
 python3 scripts/check-availability.py --help
 python3 scripts/find-venue.py --help
 ```
-5. Confirm the agent can access the human calendar via the configured calendar ID.
+1. Confirm the agent can access the human calendar via the configured calendar ID.
 
 ## Gmail + Calendar Setup (Agent Account)
 
@@ -92,6 +99,7 @@ python3 scripts/find-venue.py --help
 - include timezone labels in every time reference
 - display times with standard US labels (`ET`, `CT`, `MT`, `PT`)
 - if counterparty timezone differs, include both (example: `3:00 PM ET / 12:00 PM PT`)
+- for virtual meetings, create the calendar event with `--meet` so Google Meet is generated automatically
 
 ## How Scheduling Flows
 
@@ -102,19 +110,6 @@ python3 scripts/find-venue.py --help
 5. Create tentative holds for approved options
 6. Draft outreach email and wait for approval
 7. Send approved outreach and track thread state
-8. On acceptance, create final event and related buffers/travel blocks
+8. On acceptance, create final event and related buffers/travel blocks (virtual meetings use `--meet`)
 9. Send approved confirmation follow-up
 10. Update tracking record with all event IDs and status
-
-## Typical Prompts
-
-- "Schedule coffee with Alex next week in SF."
-- "Find 3 lunch options in Midtown and propose times."
-- "Reschedule my meeting with Dana from Thursday to next week."
-- "Cancel tomorrow's lunch with Chris and send a polite note."
-
-## Notes
-
-- Time calculations can use IANA zones internally (for scripts/calendar math).
-- External email should use user-friendly labels (`ET`, `CT`, `MT`, `PT`).
-- If recipient timezone differs, show both times to reduce back-and-forth.
