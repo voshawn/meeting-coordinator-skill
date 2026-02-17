@@ -44,6 +44,22 @@ The agent sends email as the agent Gmail account and schedules on the human's sh
 6. `USER.md` available to the agent
 7. `SOUL.md` or `IDENTITY.md` available to the agent
 
+## Declared Runtime + Credentials
+
+This skill declares the following in `SKILL.md` `metadata.openclaw`:
+
+- required binaries: `gog`, `goplaces`, `python3`
+- required env vars: `GOG_ACCOUNT`, `GOOGLE_PLACES_API_KEY`
+- required config dirs: `$HOME/.config/gog`, `$HOME/.config/goplaces`
+- primary credential selector: `GOG_ACCOUNT`
+- homepage/source: `https://github.com/voshawn/meeting-coordinator-skill`
+
+Notes:
+
+- `GOG_ACCOUNT` identifies which authenticated Google account `gog` will operate as.
+- `gog` OAuth tokens are local credentials; use a dedicated, low-privilege agent account.
+- `GOOGLE_PLACES_API_KEY` powers venue lookup through `goplaces`.
+
 ## Required Profile Data
 
 `USER.md` should include:
@@ -92,6 +108,17 @@ python3 scripts/find-venue.py --help
 3. Grant at least "Make changes to events".
 4. Put that shared calendar ID into `USER.md`.
 5. Do not use `primary` unless explicitly intended.
+
+## Preflight Verification (Run Before First Write Action)
+
+```bash
+echo "$GOG_ACCOUNT"
+gog auth list
+test -n "$GOOGLE_PLACES_API_KEY"
+gog calendar events "<shared_calendar_id>" --from "<YYYY-MM-DD>T00:00:00" --to "<YYYY-MM-DD>T23:59:59"
+```
+
+If any check fails, stop and fix auth/config before scheduling.
 
 ## Email Formatting Rules
 
