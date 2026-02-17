@@ -1,10 +1,9 @@
 ---
 name: meeting-coordinator
 description: Executive scheduling assistant for meeting coordination: intake, availability analysis, venue selection, email outreach, calendar management, reservations, rescheduling, cancellation, and status tracking with strict approval gates.
-binaries:
-  - gog
-  - goplaces
-  - python3
+homepage: "https://github.com/voshawn/meeting-coordinator-skill"
+metadata:
+  openclaw: '{"author":"Shawn Vo","repo":"https://github.com/voshawn/meeting-coordinator-skill","tags":["calendar","email","scheduling","assistant"],"requires":{"bins":["gog","goplaces","python3"],"env":["GOG_ACCOUNT","GOOGLE_PLACES_API_KEY"],"config":["$HOME/.config/gog","$HOME/.config/goplaces"]},"runtime":{"type":"local","install":"gog --help && goplaces --help && python3 --version","run":"echo \"Instruction-only skill: invoke from prompt with $meeting-coordinator\""},"primaryEnv":"GOG_ACCOUNT","homepage":"https://github.com/voshawn/meeting-coordinator-skill"}'
 ---
 
 # Meeting Coordinator
@@ -59,6 +58,32 @@ Minimize scheduling friction while protecting the human's time and reputation:
 
 If required context is missing, ask concise clarification questions before taking action.
 
+## Runtime + Credential Model
+
+This skill relies on local CLI authentication and local config state.
+
+- Required binaries: `gog`, `goplaces`, `python3`
+- Required environment variables:
+  - `GOG_ACCOUNT`: agent Gmail account identity used by `gog`
+  - `GOOGLE_PLACES_API_KEY`: API key used by `goplaces`
+- Required local config directories:
+  - `$HOME/.config/gog`
+  - `$HOME/.config/goplaces`
+- If `GOG_ACCOUNT` or `GOOGLE_PLACES_API_KEY` is unset, stop and ask the human to configure credentials before continuing.
+
+Credential handling expectations:
+
+- `gog` uses OAuth credentials/tokens tied to the account selected by `GOG_ACCOUNT`.
+- `goplaces` uses `GOOGLE_PLACES_API_KEY`.
+- Never assume default account selection. Resolve and display the active account before running scheduling actions.
+
+Preflight checks (required before first mutation in a session):
+
+1. Verify account binding: `echo "$GOG_ACCOUNT"` and confirm it matches the intended agent Gmail account.
+2. Verify `gog` auth state: `gog auth list`.
+3. Verify `goplaces` key is present: `test -n "$GOOGLE_PLACES_API_KEY"`.
+4. Verify target calendar access with a read action before writes.
+
 ## Non-Negotiable Rules
 
 ### Approval gates
@@ -69,6 +94,7 @@ If required context is missing, ask concise clarification questions before takin
   - Cancelling or rescheduling confirmed meetings
   - Making or modifying reservations
   - Moving existing events that create conflicts
+- For every mutating action, present the exact command(s) first and wait for explicit approval tied to that action. Prior approvals do not carry forward if details change.
 - **Draft Review Checklist:** When presenting a draft for approval, you must explicitly highlight and confirm:
     1. **Recipients:** Who exactly is on the To: and CC: lines.
     2. **Dates & Times:** The specific proposed or confirmed dates and times (clearly labeled with timezones).
