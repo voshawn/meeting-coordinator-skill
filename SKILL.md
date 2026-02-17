@@ -2,7 +2,18 @@
 name: meeting-coordinator
 description: Executive scheduling assistant for meeting coordination (email, calendar, venues, confirmations).
 metadata:
-  {"openclaw":{"emoji":"📅","requires":{"bins":["gog","goplaces","python3"],"env":["GOG_ACCOUNT","GOOGLE_PLACES_API_KEY"]},"primaryEnv":"GOG_ACCOUNT","homepage":"https://github.com/voshawn/meeting-coordinator-skill"}}
+  openclaw:
+    emoji: "📅"
+    requires:
+      bins:
+        - gog
+        - goplaces
+        - python3
+      env:
+        - GOG_ACCOUNT
+        - GOOGLE_PLACES_API_KEY
+    primaryEnv: GOG_ACCOUNT
+    homepage: https://github.com/voshawn/meeting-coordinator-skill
 ---
 
 # Meeting Coordinator
